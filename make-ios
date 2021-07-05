@@ -1,0 +1,2 @@
+clang++ -arch arm64 -std=c++17 -isysroot /Volumes/PortableSSD/Xcode-beta.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk -framework Foundation -o Adam.app -I include src/main.cpp -l sqlite3
+ldid -S Adam.app
