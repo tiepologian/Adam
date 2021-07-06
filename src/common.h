@@ -16,7 +16,7 @@ namespace Utils
     {
         return std::filesystem::exists(std::filesystem::path(filename));
     }
-    std::size_t replace_all(std::string &inout, std::string_view what, std::string_view with)
+    static std::size_t replace_all(std::string &inout, std::string_view what, std::string_view with)
     {
         std::size_t count{};
         for (std::string::size_type pos{};

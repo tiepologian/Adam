@@ -21,7 +21,6 @@ namespace sqlite
     public:
         SqliteWrapper(std::string filename)
         {
-            std::cout << "[*] Called wrapper constructor" << std::endl;
             this->filename_ = filename;
             int rc = sqlite3_open(filename.c_str(), &this->db_);
             if (rc != SQLITE_OK)
@@ -30,7 +29,6 @@ namespace sqlite
                 sqlite3_close(this->db_);
                 exit(1);
             }
-            std::cout << "[*] Connected to sqlite" << std::endl;
         }
         /*
          * Take snapshot of entire database
@@ -70,8 +68,7 @@ namespace sqlite
         }
         virtual ~SqliteWrapper()
         {
-            std::cout << "[*] Called wrapper destructor" << std::endl;
-            sqlite3_close(this->db_);
+            std::cout << "Closing sqlite with code " << sqlite3_close(this->db_) << std::endl;
         }
 
     private:
@@ -185,7 +182,7 @@ namespace sqlite
             char cmd[4096] = {0};
 
             fp = fopen(filename, "w");
-            
+
             if (!fp)
             {
                 std::cout << "[!] Error opening file" << std::endl;
@@ -212,8 +209,9 @@ namespace sqlite
                 table_name = (const char *)sqlite3_column_text(stmt_table, 1);
                 if (!data || !table_name)
                 {
-                    ret = -1;
-                    goto EXIT;
+                    std::cout << "[!] Error running query: " << ret << std::endl;
+                    sqlite3_close(this->db_);
+                    exit(1);
                 }
 
                 /* CREATE TABLE statements */
@@ -224,7 +222,11 @@ namespace sqlite
 
                 ret = sqlite3_prepare_v2(this->db_, cmd, -1, &stmt_data, NULL);
                 if (ret != SQLITE_OK)
-                    goto EXIT;
+                {
+                    std::cout << "[!] Error running query: " << ret << std::endl;
+                    sqlite3_close(this->db_);
+                    exit(1);
+                }
 
                 ret = sqlite3_step(stmt_data);
                 while (ret == SQLITE_ROW)
@@ -295,7 +297,11 @@ namespace sqlite
             ret = sqlite3_prepare_v2(this->db_, "SELECT sql FROM sqlite_master WHERE type = 'trigger';",
                                      -1, &stmt_table, NULL);
             if (ret != SQLITE_OK)
-                goto EXIT;
+            {
+                std::cout << "[!] Error running query: " << ret << std::endl;
+                sqlite3_close(this->db_);
+                exit(1);
+            }
 
             ret = sqlite3_step(stmt_table);
             while (ret == SQLITE_ROW)
@@ -303,8 +309,9 @@ namespace sqlite
                 data = (const char *)sqlite3_column_text(stmt_table, 0);
                 if (!data)
                 {
-                    ret = -1;
-                    goto EXIT;
+                    std::cout << "[!] Error running query: " << ret << std::endl;
+                    sqlite3_close(this->db_);
+                    exit(1);
                 }
 
                 /* CREATE TABLE statements */
@@ -315,7 +322,6 @@ namespace sqlite
 
             fprintf(fp, "COMMIT;\n");
 
-        EXIT:
             if (stmt_data)
                 sqlite3_finalize(stmt_data);
             if (stmt_table)

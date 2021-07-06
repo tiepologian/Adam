@@ -17,7 +17,7 @@ namespace Adam
         Adam()
         {
             this->isLive_ = false;
-            Adam::isTableMode_ = false;
+            this->isTableMode_ = false;
             std::filesystem::create_directory(std::filesystem::temp_directory_path() / "adam-tmp");
         }
         virtual ~Adam()
@@ -34,30 +34,17 @@ namespace Adam
         }
         void setOutputFile(std::string s)
         {
-            Adam::outPath_ = s;
+            this->outPath_ = s;
             std::cout << "[*] Writing output to " << s << std::endl;
         }
         void setTableMode(std::string table)
         {
             this->isTableMode_ = true;
-            Adam::tableName_ = table;
+            this->tableName_ = table;
         }
         static void signalHandler(int signal __attribute__((unused)))
         {
-            json result;
-            for (auto i : wrappers_)
-            {
-                std::cout << std::endl;
-                if (isTableMode_)
-                    i->snapshot(tableName_);
-                else
-                    i->snapshot();
-                std::cout << "[*] Analyzing " << i->getSnapshotsNum() << " snapshots for " << i->getFilename() << std::endl;
-                result[i->getFilename()] = Utils::unifiedDiff(i->getSnapshots().first, i->getSnapshots().second);
-            }
-            std::ofstream outJson(Adam::outPath_);
-            outJson << std::setw(4) << result << std::endl;
-            outJson.close();
+            return;
         }
         void run()
         {
@@ -67,24 +54,39 @@ namespace Adam
             {
                 auto wrapper = std::make_shared<sqlite::SqliteWrapper>(i);
                 std::cout << "[*] Monitoring " << i << std::endl;
-                if (isTableMode_)
-                    wrapper->snapshot(tableName_);
+                if (this->isTableMode_)
+                    wrapper->snapshot(this->tableName_);
                 else
                     wrapper->snapshot();
-                wrappers_.push_back(wrapper);
+                this->wrappers_.push_back(wrapper);
             }
             std::signal(SIGINT, Adam::signalHandler);
             std::cout << "[*] Ready. Ctrl+C to stop." << std::endl;
+
             pause();
+
+            json result;
+            for (auto i : this->wrappers_)
+            {
+                if (this->isTableMode_)
+                    i->snapshot(this->tableName_);
+                else
+                    i->snapshot();
+                std::cout << "[*] Analyzing " << i->getSnapshotsNum() << " snapshots for " << i->getFilename() << std::endl;
+                result[i->getFilename()] = Utils::unifiedDiff(i->getSnapshots().first, i->getSnapshots().second);
+            }
+            std::ofstream outJson(this->outPath_);
+            outJson << std::setw(4) << result << std::endl;
+            outJson.close();
         }
 
     private:
         std::vector<std::string> dbPath_;
-        inline static std::string outPath_;
-        inline static std::vector<std::shared_ptr<sqlite::SqliteWrapper>> wrappers_;
-        inline static std::string tableName_;
+        std::string outPath_;
+        std::vector<std::shared_ptr<sqlite::SqliteWrapper>> wrappers_;
+        std::string tableName_;
         bool isLive_;
-        inline static bool isTableMode_;
+        bool isTableMode_;
     };
 }
 
