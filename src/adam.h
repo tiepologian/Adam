@@ -72,7 +72,7 @@ namespace Adam
                     i->snapshot(this->tableName_);
                 else
                     i->snapshot();
-                std::cout << "[*] Analyzing " << i->getSnapshotsNum() << " snapshots for " << i->getFilename() << std::endl;
+                std::cout << std::endl << "[*] Analyzing " << i->getSnapshotsNum() << " snapshots for " << i->getFilename() << std::endl;
                 result[i->getFilename()] = Utils::unifiedDiff(i->getSnapshots().first, i->getSnapshots().second);
             }
             std::ofstream outJson(this->outPath_);
