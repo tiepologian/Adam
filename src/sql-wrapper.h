@@ -68,7 +68,7 @@ namespace sqlite
         }
         virtual ~SqliteWrapper()
         {
-            std::cout << "Closing sqlite with code " << sqlite3_close(this->db_) << std::endl;
+            sqlite3_close(this->db_);
         }
 
     private:
@@ -80,6 +80,7 @@ namespace sqlite
             int index = 0;
             int col_cnt = 0;
             char cmd[4096] = {0};
+            char tmp_cmd[4096] = {0};
             const char *data = NULL;
 
             fp = fopen(filename, "w");
@@ -113,13 +114,8 @@ namespace sqlite
                     /* @TODO Add support for BLOBs */
                     if (sqlite3_column_type(stmt_table, index) == SQLITE_BLOB)
                     {
-                        strcat(cmd, "{'");
-                        strcat(cmd, sqlite3_column_name(stmt_table, index));
-                        strcat(cmd, "':");
-                        strcat(cmd, "'");
-                        strcat(cmd, "blob");
-                        strcat(cmd, "'");
-                        strcat(cmd, "}");
+                        sprintf(tmp_cmd, "{'%s':'blob'}", sqlite3_column_name(stmt_table, index));
+                        strcat(cmd, tmp_cmd);
                     }
                     else
                     {
@@ -128,31 +124,19 @@ namespace sqlite
                         {
                             if (sqlite3_column_type(stmt_table, index) == SQLITE_TEXT)
                             {
-                                // @TODO fix these strcats
-                                strcat(cmd, "{'");
-                                strcat(cmd, sqlite3_column_name(stmt_table, index));
-                                strcat(cmd, "':");
-                                strcat(cmd, "'");
-                                strcat(cmd, data);
-                                strcat(cmd, "'");
-                                strcat(cmd, "}");
+                                sprintf(tmp_cmd, "{'%s':'%s'}", sqlite3_column_name(stmt_table, index), data);
+                                strcat(cmd, tmp_cmd);
                             }
                             else
                             {
-                                strcat(cmd, "{'");
-                                strcat(cmd, sqlite3_column_name(stmt_table, index));
-                                strcat(cmd, "':");
-                                strcat(cmd, data);
-                                strcat(cmd, "}");
+                                sprintf(tmp_cmd, "{'%s':%s}", sqlite3_column_name(stmt_table, index), data);
+                                strcat(cmd, tmp_cmd);
                             }
                         }
                         else
                         {
-                            strcat(cmd, "{'");
-                            strcat(cmd, sqlite3_column_name(stmt_table, index));
-                            strcat(cmd, "':");
-                            strcat(cmd, "NULL");
-                            strcat(cmd, "}");
+                            sprintf(tmp_cmd, "{'%s':NULL}", sqlite3_column_name(stmt_table, index));
+                            strcat(cmd, tmp_cmd);
                         }
                     }
                 }
@@ -180,6 +164,7 @@ namespace sqlite
             int ret = 0;
             int index = 0;
             char cmd[4096] = {0};
+            char tmp_cmd[4096] = {0};
 
             fp = fopen(filename, "w");
 
@@ -200,22 +185,16 @@ namespace sqlite
                 exit(1);
             }
 
-            fprintf(fp, "PRAGMA foreign_keys=OFF;\nBEGIN TRANSACTION;\n");
-
             ret = sqlite3_step(stmt_table);
             while (ret == SQLITE_ROW)
             {
-                data = (const char *)sqlite3_column_text(stmt_table, 0);
                 table_name = (const char *)sqlite3_column_text(stmt_table, 1);
-                if (!data || !table_name)
+                if (!table_name)
                 {
                     std::cout << "[!] Error running query: " << ret << std::endl;
                     sqlite3_close(this->db_);
                     exit(1);
                 }
-
-                /* CREATE TABLE statements */
-                fprintf(fp, "%s;\n", data);
 
                 /* fetch table data */
                 sprintf(cmd, "SELECT * from %s;", table_name);
@@ -241,13 +220,8 @@ namespace sqlite
                         /* @TODO Add support for BLOBs */
                         if (sqlite3_column_type(stmt_data, index) == SQLITE_BLOB)
                         {
-                            strcat(cmd, "{'");
-                            strcat(cmd, sqlite3_column_name(stmt_data, index));
-                            strcat(cmd, "':");
-                            strcat(cmd, "'");
-                            strcat(cmd, "blob");
-                            strcat(cmd, "'");
-                            strcat(cmd, "}");
+                            printf(tmp_cmd, "{'%s':'blob'}", sqlite3_column_name(stmt_data, index));
+                            strcat(cmd, tmp_cmd);
                         }
                         else
                         {
@@ -256,74 +230,30 @@ namespace sqlite
                             {
                                 if (sqlite3_column_type(stmt_data, index) == SQLITE_TEXT)
                                 {
-                                    strcat(cmd, "{'");
-                                    strcat(cmd, sqlite3_column_name(stmt_data, index));
-                                    strcat(cmd, "':");
-                                    strcat(cmd, "'");
-                                    strcat(cmd, data);
-                                    strcat(cmd, "'");
-                                    strcat(cmd, "}");
+                                    sprintf(tmp_cmd, "{'%s':'%s'}", sqlite3_column_name(stmt_data, index), data);
+                                    strcat(cmd, tmp_cmd);
                                 }
                                 else
                                 {
-                                    strcat(cmd, "{'");
-                                    strcat(cmd, sqlite3_column_name(stmt_data, index));
-                                    strcat(cmd, "':");
-                                    strcat(cmd, data);
-                                    strcat(cmd, "}");
+                                    sprintf(tmp_cmd, "{'%s':%s}", sqlite3_column_name(stmt_data, index), data);
+                                    strcat(cmd, tmp_cmd);
                                 }
                             }
                             else
                             {
-                                strcat(cmd, "{'");
-                                strcat(cmd, sqlite3_column_name(stmt_data, index));
-                                strcat(cmd, "':");
-                                strcat(cmd, "NULL");
-                                strcat(cmd, "}");
+                                sprintf(tmp_cmd, "{'%s':NULL}", sqlite3_column_name(stmt_data, index));
+                                strcat(cmd, tmp_cmd);
                             }
                         }
                     }
                     fprintf(fp, "%s);\n", cmd);
                     ret = sqlite3_step(stmt_data);
                 }
-
+                if (stmt_data)
+                    sqlite3_finalize(stmt_data);
                 ret = sqlite3_step(stmt_table);
             }
 
-            /* Triggers */
-            if (stmt_table)
-                sqlite3_finalize(stmt_table);
-
-            ret = sqlite3_prepare_v2(this->db_, "SELECT sql FROM sqlite_master WHERE type = 'trigger';",
-                                     -1, &stmt_table, NULL);
-            if (ret != SQLITE_OK)
-            {
-                std::cout << "[!] Error running query: " << ret << std::endl;
-                sqlite3_close(this->db_);
-                exit(1);
-            }
-
-            ret = sqlite3_step(stmt_table);
-            while (ret == SQLITE_ROW)
-            {
-                data = (const char *)sqlite3_column_text(stmt_table, 0);
-                if (!data)
-                {
-                    std::cout << "[!] Error running query: " << ret << std::endl;
-                    sqlite3_close(this->db_);
-                    exit(1);
-                }
-
-                /* CREATE TABLE statements */
-                fprintf(fp, "%s;\n", data);
-
-                ret = sqlite3_step(stmt_table);
-            }
-
-            fprintf(fp, "COMMIT;\n");
-
-            if (stmt_data)
-                sqlite3_finalize(stmt_data);
             if (stmt_table)
                 sqlite3_finalize(stmt_table);
             if (fp)
