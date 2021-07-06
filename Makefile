@@ -13,7 +13,6 @@ all: $(BIN)/$(EXECUTABLE)
 
 clean:
 	$(RM) $(BIN)/$(EXECUTABLE)
-	$(RM) *.snap
 
 run: all
 	./$(BIN)/$(EXECUTABLE)

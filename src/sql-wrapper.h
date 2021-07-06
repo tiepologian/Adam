@@ -21,6 +21,7 @@ namespace sqlite
     public:
         SqliteWrapper(std::string filename)
         {
+            std::cout << "[*] Called wrapper constructor" << std::endl;
             this->filename_ = filename;
             int rc = sqlite3_open(filename.c_str(), &this->db_);
             if (rc != SQLITE_OK)
@@ -29,18 +30,27 @@ namespace sqlite
                 sqlite3_close(this->db_);
                 exit(1);
             }
+            std::cout << "[*] Connected to sqlite" << std::endl;
         }
-        void snapshot(std::string sqlname)
-        {
-            dumpDb(sqlname.c_str());
-            this->sn_.push_back(sqlname);
-            return;
-        }
+        /*
+         * Take snapshot of entire database
+         */
         void snapshot()
         {
             std::string snapName = this->getFilename();
             snapName = snapName + "-" + std::to_string(this->getSnapshotsNum()) + ".snap";
             dumpDb(snapName.c_str());
+            this->sn_.push_back(snapName);
+            return;
+        }
+        /*
+         * Take snapshot of specified table
+         */
+        void snapshot(std::string table)
+        {
+            std::string snapName = this->getFilename();
+            snapName = snapName + "-" + std::to_string(this->getSnapshotsNum()) + ".snap";
+            dumpTable(snapName.c_str(), table.c_str());
             this->sn_.push_back(snapName);
             return;
         }
@@ -60,10 +70,108 @@ namespace sqlite
         }
         virtual ~SqliteWrapper()
         {
+            std::cout << "[*] Called wrapper destructor" << std::endl;
             sqlite3_close(this->db_);
         }
 
     private:
+        int dumpTable(const char *filename, const char *tablename)
+        {
+            FILE *fp = NULL;
+            sqlite3_stmt *stmt_table = NULL;
+            int ret = 0;
+            int index = 0;
+            int col_cnt = 0;
+            char cmd[4096] = {0};
+            const char *data = NULL;
+
+            fp = fopen(filename, "w");
+            if (!fp)
+            {
+                std::cout << "[!] Error opening file for writing" << std::endl;
+                sqlite3_close(this->db_);
+                exit(1);
+            }
+
+            sprintf(cmd, "SELECT * FROM %s;", tablename);
+            ret = sqlite3_prepare_v2(this->db_, cmd, -1, &stmt_table, NULL);
+
+            if (ret != SQLITE_OK)
+            {
+                std::cout << "[!] Error running query: " << ret << std::endl;
+                sqlite3_close(this->db_);
+                exit(1);
+            }
+
+            ret = sqlite3_step(stmt_table);
+            while (ret == SQLITE_ROW)
+            {
+                sprintf(cmd, "INSERT INTO \"%s\" VALUES(", tablename);
+                col_cnt = sqlite3_column_count(stmt_table);
+                for (index = 0; index < col_cnt; index++)
+                {
+                    if (index)
+                        strcat(cmd, ",");
+
+                    /* @TODO Add support for BLOBs */
+                    if (sqlite3_column_type(stmt_table, index) == SQLITE_BLOB)
+                    {
+                        strcat(cmd, "{'");
+                        strcat(cmd, sqlite3_column_name(stmt_table, index));
+                        strcat(cmd, "':");
+                        strcat(cmd, "'");
+                        strcat(cmd, "blob");
+                        strcat(cmd, "'");
+                        strcat(cmd, "}");
+                    }
+                    else
+                    {
+                        data = (const char *)sqlite3_column_text(stmt_table, index);
+                        if (data)
+                        {
+                            if (sqlite3_column_type(stmt_table, index) == SQLITE_TEXT)
+                            {
+                                // @TODO fix these strcats
+                                strcat(cmd, "{'");
+                                strcat(cmd, sqlite3_column_name(stmt_table, index));
+                                strcat(cmd, "':");
+                                strcat(cmd, "'");
+                                strcat(cmd, data);
+                                strcat(cmd, "'");
+                                strcat(cmd, "}");
+                            }
+                            else
+                            {
+                                strcat(cmd, "{'");
+                                strcat(cmd, sqlite3_column_name(stmt_table, index));
+                                strcat(cmd, "':");
+                                strcat(cmd, data);
+                                strcat(cmd, "}");
+                            }
+                        }
+                        else
+                        {
+                            strcat(cmd, "{'");
+                            strcat(cmd, sqlite3_column_name(stmt_table, index));
+                            strcat(cmd, "':");
+                            strcat(cmd, "NULL");
+                            strcat(cmd, "}");
+                        }
+                    }
+                }
+                fprintf(fp, "%s);\n", cmd);
+                ret = sqlite3_step(stmt_table);
+            }
+
+            if (stmt_table)
+                sqlite3_finalize(stmt_table);
+            if (fp)
+            {
+                fclose(fp);
+            }
+
+            return ret;
+        }
         int dumpDb(const char *filename)
         {
             FILE *fp = NULL;
@@ -74,20 +182,26 @@ namespace sqlite
             int col_cnt = 0;
             int ret = 0;
             int index = 0;
-            //char cmd[4096] = {0};
-            // @TODO fix-this
-            char cmd[65000] = {0};
+            char cmd[4096] = {0};
 
             fp = fopen(filename, "w");
-            // @TODO handle exception
+            
             if (!fp)
-                return -1;
+            {
+                std::cout << "[!] Error opening file" << std::endl;
+                sqlite3_close(this->db_);
+                exit(1);
+            }
 
             ret = sqlite3_prepare_v2(this->db_, "SELECT sql,tbl_name FROM sqlite_master WHERE type = 'table';",
                                      -1, &stmt_table, NULL);
 
             if (ret != SQLITE_OK)
-                goto EXIT;
+            {
+                std::cout << "[!] Error running query: " << ret << std::endl;
+                sqlite3_close(this->db_);
+                exit(1);
+            }
 
             fprintf(fp, "PRAGMA foreign_keys=OFF;\nBEGIN TRANSACTION;\n");
 
@@ -209,7 +323,6 @@ namespace sqlite
             if (fp)
             {
                 fclose(fp);
-                sqlite3_close(this->db_);
             }
             return ret;
         }

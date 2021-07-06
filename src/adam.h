@@ -4,6 +4,7 @@
 #include <csignal>
 #include "sql-wrapper.h"
 #include "common.h"
+#include <memory>
 
 #ifndef ADAMPP
 #define ADAMPP
@@ -16,6 +17,7 @@ namespace Adam
         Adam()
         {
             this->isLive_ = false;
+            Adam::isTableMode_ = false;
             std::filesystem::create_directory(std::filesystem::temp_directory_path() / "adam-tmp");
         }
         virtual ~Adam()
@@ -35,15 +37,23 @@ namespace Adam
             Adam::outPath_ = s;
             std::cout << "[*] Writing output to " << s << std::endl;
         }
+        void setTableMode(std::string table)
+        {
+            this->isTableMode_ = true;
+            Adam::tableName_ = table;
+        }
         static void signalHandler(int signal __attribute__((unused)))
         {
             json result;
             for (auto i : wrappers_)
             {
                 std::cout << std::endl;
-                i.snapshot();
-                std::cout << "[*] Analyzing " << i.getSnapshotsNum() << " snapshots for " << i.getFilename() << std::endl;
-                result[i.getFilename()] = Utils::unifiedDiff(i.getSnapshots().first, i.getSnapshots().second);
+                if (isTableMode_)
+                    i->snapshot(tableName_);
+                else
+                    i->snapshot();
+                std::cout << "[*] Analyzing " << i->getSnapshotsNum() << " snapshots for " << i->getFilename() << std::endl;
+                result[i->getFilename()] = Utils::unifiedDiff(i->getSnapshots().first, i->getSnapshots().second);
             }
             std::ofstream outJson(Adam::outPath_);
             outJson << std::setw(4) << result << std::endl;
@@ -55,9 +65,12 @@ namespace Adam
             std::cout << "[*] Writing tmp files to " << std::filesystem::current_path() << std::endl;
             for (auto i : this->dbPath_)
             {
-                sqlite::SqliteWrapper wrapper(i);
+                auto wrapper = std::make_shared<sqlite::SqliteWrapper>(i);
                 std::cout << "[*] Monitoring " << i << std::endl;
-                wrapper.snapshot();
+                if (isTableMode_)
+                    wrapper->snapshot(tableName_);
+                else
+                    wrapper->snapshot();
                 wrappers_.push_back(wrapper);
             }
             std::signal(SIGINT, Adam::signalHandler);
@@ -68,8 +81,10 @@ namespace Adam
     private:
         std::vector<std::string> dbPath_;
         inline static std::string outPath_;
-        inline static std::vector<sqlite::SqliteWrapper> wrappers_;
+        inline static std::vector<std::shared_ptr<sqlite::SqliteWrapper>> wrappers_;
+        inline static std::string tableName_;
         bool isLive_;
+        inline static bool isTableMode_;
     };
 }
 
