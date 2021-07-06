@@ -79,8 +79,8 @@ namespace sqlite
             int ret = 0;
             int index = 0;
             int col_cnt = 0;
-            char cmd[4096] = {0};
-            char tmp_cmd[4096] = {0};
+            char cmd[16000] = {0};
+            char tmp_cmd[16000] = {0};
             const char *data = NULL;
 
             fp = fopen(filename, "w");
@@ -119,6 +119,7 @@ namespace sqlite
                     }
                     else
                     {
+                        /* @TODO Check size of data before copying to cmd */
                         data = (const char *)sqlite3_column_text(stmt_table, index);
                         if (data)
                         {
@@ -163,8 +164,8 @@ namespace sqlite
             int col_cnt = 0;
             int ret = 0;
             int index = 0;
-            char cmd[4096] = {0};
-            char tmp_cmd[4096] = {0};
+            char cmd[16000] = {0};
+            char tmp_cmd[16000] = {0};
 
             fp = fopen(filename, "w");
 
@@ -220,11 +221,12 @@ namespace sqlite
                         /* @TODO Add support for BLOBs */
                         if (sqlite3_column_type(stmt_data, index) == SQLITE_BLOB)
                         {
-                            printf(tmp_cmd, "{'%s':'blob'}", sqlite3_column_name(stmt_data, index));
+                            sprintf(tmp_cmd, "{'%s':'blob'}", sqlite3_column_name(stmt_data, index));
                             strcat(cmd, tmp_cmd);
                         }
                         else
                         {
+                            /* @TODO Check size of data before copying to cmd */
                             data = (const char *)sqlite3_column_text(stmt_data, index);
                             if (data)
                             {
