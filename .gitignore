@@ -1,4 +1,4 @@
 /.DS_Store
 /.vscode
 output.json
-dist/Adam.app
+dist/*
