@@ -33,6 +33,29 @@ using dtl::elemInfo;
 using dtl::uniHunk;
 using json = nlohmann::json;
 
+#define ADAM_VERSION "0.1"
+
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+
+#if defined __clang__
+#define COMPILER __VERSION__
+#elif defined __GNUC__
+#define COMPILER "GCC " STR(__GNUC__) "." STR(__GNUC_MINOR__) "." STR(__GNUC_PATCHLEVEL__)
+#else
+#define COMPILER "UNKNOWN COMPILER"
+#endif
+
+#if defined __x86_64__
+#define TARGET "x86_64"
+#elif defined __arm64__
+#define TARGET "arm64"
+#else
+#define TARGET ""
+#endif
+
+#define ADAM_VERSION_STR "Adam v" ADAM_VERSION " " COMPILER " " TARGET
+
 namespace Utils
 {
     static bool checkFileExists(std::string filename)
@@ -111,8 +134,6 @@ namespace Utils
                     std::string table = Utils::extractTableName(query);
                     std::string queryType = (j.second.type == 1) ? Utils::extractQueryType(query) : "DELETE";
                     std::string queryValues = Utils::extractQueryData(query);
-                    //std::cout  << queryType << " > " << table << std::endl;
-                    //std::cout << queryValues << std::endl;
                     json j;
                     j["QueryType"] = queryType;
                     j["Table"] = table;

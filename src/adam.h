@@ -25,9 +25,10 @@
 #include <thread>
 #include <unistd.h>
 #include <csignal>
+#include <memory>
 #include "sql-wrapper.h"
 #include "common.h"
-#include <memory>
+#include "spinners.hpp"
 
 #ifndef ADAMPP
 #define ADAMPP
@@ -41,11 +42,16 @@ namespace Adam
         {
             this->isLive_ = false;
             this->isTableMode_ = false;
+            this->spin_ = new spinners::Spinner();
+            this->spin_->setInterval(100);
+            this->spin_->setSymbols("dots");
             std::filesystem::create_directory(std::filesystem::temp_directory_path() / "adam-tmp");
+            std::cout << std::endl << "[*] " << ADAM_VERSION_STR << std::endl;
         }
         virtual ~Adam()
         {
             std::filesystem::remove_all(std::filesystem::temp_directory_path() / "adam-tmp");
+            delete this->spin_;
         }
         void addFile(std::string f)
         {
@@ -58,7 +64,6 @@ namespace Adam
         void setOutputFile(std::string s)
         {
             this->outPath_ = s;
-            std::cout << "[*] Writing output to " << s << std::endl;
         }
         void setTableMode(std::string table)
         {
@@ -72,16 +77,16 @@ namespace Adam
         void run()
         {
             std::filesystem::current_path(std::filesystem::temp_directory_path() / "adam-tmp");
-            std::cout << "[*] Writing tmp files to " << std::filesystem::current_path() << std::endl;
             for (auto i : this->dbPath_)
             {
                 auto wrapper = std::make_shared<sqlite::SqliteWrapper>(i);
-                std::cout << "[*] Monitoring " << i << std::endl;
+                this->spin_->start("Snapshotting " + i, true);
                 if (this->isTableMode_)
                     wrapper->snapshot(this->tableName_);
                 else
                     wrapper->snapshot();
                 this->wrappers_.push_back(wrapper);
+                this->spin_->stop();
             }
             std::signal(SIGINT, Adam::signalHandler);
             std::cout << "[*] Ready. Ctrl+C to stop." << std::endl;
@@ -89,18 +94,22 @@ namespace Adam
             pause();
 
             json result;
+            std::cout << std::endl;
             for (auto i : this->wrappers_)
             {
+                this->spin_->start("Processing " + i->getFilename(), true);
                 if (this->isTableMode_)
                     i->snapshot(this->tableName_);
                 else
                     i->snapshot();
-                std::cout << std::endl << "[*] Analyzing " << i->getSnapshotsNum() << " snapshots for " << i->getFilename() << std::endl;
                 result[i->getFilename()] = Utils::unifiedDiff(i->getSnapshots().first, i->getSnapshots().second);
+                this->spin_->stop();
             }
+            std::cout << "[*] Writing output to " << this->outPath_ << std::endl;
             std::ofstream outJson(this->outPath_);
             outJson << std::setw(4) << result << std::endl;
             outJson.close();
+            std::cout << "[*] Finished ;-)" << std::endl << std::endl;
         }
 
     private:
@@ -110,6 +119,7 @@ namespace Adam
         std::string tableName_;
         bool isLive_;
         bool isTableMode_;
+        spinners::Spinner *spin_;
     };
 }
 
