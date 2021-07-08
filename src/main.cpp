@@ -27,7 +27,7 @@
 int main(int argc, char **argv)
 {
     cxxopts::Options options("Adam", "Apple Database Async Monitor");
-    options.add_options()("d,database", "Specify database to monitor", cxxopts::value<std::vector<std::string>>(), "FILE")("t,table", "Only monitor specific database table", cxxopts::value<std::string>())("o,output", "Specify output JSON file", cxxopts::value<std::string>()->default_value("output.json"))("l,live", "Enable live mode", cxxopts::value<bool>()->default_value("false"))("h,help", "Print usage");
+    options.add_options()("d,database", "Database to monitor", cxxopts::value<std::vector<std::string>>(), "FILE")("t,table", "Optional table to monitor", cxxopts::value<std::string>(),"TABLE")("o,output", "Write output to file", cxxopts::value<std::string>()->default_value("output.json"),"FILE")("l,live", "Enable live mode", cxxopts::value<bool>()->default_value("false"))("h,help", "Print usage");
 
     auto result = options.parse(argc, argv);
     if (result.count("help"))
