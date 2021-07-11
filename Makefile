@@ -1,21 +1,22 @@
-CC		:= g++
-C_FLAGS := -std=c++17 -Wall -Wextra
+CC = gcc
+CXX = g++
+CFLAGS = -Wall -c -I include
+CXXFLAGS = -std=c++17 -Wall -Wextra -I include
 
-BIN		:= ./dist
-SRC		:= ./src
-INCLUDE	:= ./include
+BIN	= dist
+CSOURCES = src/*.c
+OBJECTC = *.o
+CXXSOURCES = src/*.cpp
 
-LIBRARIES	:= -lstdc++ -lsqlite3
+LIBRARIES = -lstdc++ -lsqlite3
+EXECUTABLE = adam
 
-EXECUTABLE	:= adam
+all: adam
 
-all: $(BIN)/$(EXECUTABLE)
+adam:
+    # $(CC) $(CFLAGS) $(CSOURCES)
+	$(CXX) $(CXXFLAGS) $(CXXSOURCES) -o $(BIN)/$(EXECUTABLE) $(LIBRARIES)
 
 clean:
 	$(RM) $(BIN)/$(EXECUTABLE)
-
-run: all
-	./$(BIN)/$(EXECUTABLE)
-
-$(BIN)/$(EXECUTABLE): $(SRC)/*.cpp
-	$(CC) $(C_FLAGS) -I$(INCLUDE) $^ -o $@ $(LIBRARIES)
+	$(RM) $(OBJECTC)
