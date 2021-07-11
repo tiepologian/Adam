@@ -1,5 +1,7 @@
-/.DS_Store
-/.vscode
-output.json
+.DS_Store
+.vscode
+*.json
+*.o
+make-ios
 dist/adam
 dist/Adam.app
